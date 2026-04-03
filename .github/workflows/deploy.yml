@@ -67,4 +67,4 @@ jobs:
         run: |
           echo "### Deployment successful :rocket:" >> $GITHUB_STEP_SUMMARY
           echo "Commit \`${{ github.sha }}\` deployed to VPS." >> $GITHUB_STEP_SUMMARY
-          echo "Endpoint: \`https://${{ secrets.VPS_HOST }}/spy-agent/signal\`" >> $GITHUB_STEP_SUMMARY
+          echo "Endpoint: \`http://93.90.203.184/spy-agent/signal\`" >> $GITHUB_STEP_SUMMARY
