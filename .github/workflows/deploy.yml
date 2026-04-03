@@ -1,0 +1,70 @@
+name: Deploy SPY Agent to VPS
+
+on:
+  push:
+    branches:
+      - main          # deploy on every push to main
+  workflow_dispatch:  # allow manual trigger from GitHub UI
+
+jobs:
+  deploy:
+    name: SSH → VPS → docker compose up
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # ── 1. Checkout (needed so we can verify the commit) ──────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Deploy via SSH ─────────────────────────────────────────────────
+      #
+      # Required GitHub Secrets (Settings → Secrets → Actions):
+      #   VPS_HOST      — IP address or hostname of your VPS
+      #   VPS_USER      — SSH username (e.g. ubuntu, root, deploy)
+      #   VPS_SSH_KEY   — Contents of your private SSH key (~/.ssh/id_rsa)
+      #   VPS_APP_DIR   — Absolute path on VPS where the repo lives
+      #                   (e.g. /home/ubuntu/spy-agent)
+      #
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:        ${{ secrets.VPS_HOST }}
+          username:    ${{ secrets.VPS_USER }}
+          key:         ${{ secrets.VPS_SSH_KEY }}
+          timeout:     600s          # allow time for docker build
+          script: |
+            set -e
+
+            APP_DIR="${{ secrets.VPS_APP_DIR }}"
+
+            echo "── Checking out latest code ──────────────────"
+            if [ -d "$APP_DIR/.git" ]; then
+              cd "$APP_DIR"
+              git fetch origin main
+              git reset --hard origin/main
+            else
+              git clone ${{ github.server_url }}/${{ github.repository }}.git "$APP_DIR"
+              cd "$APP_DIR"
+            fi
+
+            echo "── Rebuilding and restarting container ───────"
+            docker compose pull --ignore-pull-failures || true
+            docker compose up -d --build --remove-orphans
+
+            echo "── Pruning dangling images ───────────────────"
+            docker image prune -f
+
+            echo "── Health check ──────────────────────────────"
+            sleep 5
+            curl -sf http://localhost:8080/health \
+              && echo "✓ Container is healthy" \
+              || (echo "✗ Health check failed" && docker compose logs --tail=50 && exit 1)
+
+      # ── 3. Post deploy summary ────────────────────────────────────────────
+      - name: Summarise
+        if: success()
+        run: |
+          echo "### Deployment successful :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "Commit \`${{ github.sha }}\` deployed to VPS." >> $GITHUB_STEP_SUMMARY
+          echo "Endpoint: \`https://${{ secrets.VPS_HOST }}/spy-agent/signal\`" >> $GITHUB_STEP_SUMMARY

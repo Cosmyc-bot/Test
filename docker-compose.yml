@@ -5,7 +5,9 @@ services:
     container_name: spy-agent
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      # Bind only to localhost — nginx proxies externally.
+      # Remove "127.0.0.1:" prefix if you want to expose directly (no nginx).
+      - "127.0.0.1:8080:8080"
     environment:
       - PORT=8080
     healthcheck:
@@ -14,4 +16,4 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 15s
