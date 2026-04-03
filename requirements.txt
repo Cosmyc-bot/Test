@@ -1,0 +1,6 @@
+flask>=3.0
+gunicorn>=21.0
+requests>=2.31
+pandas>=2.0
+numpy>=1.26
+TA-Lib>=0.4.28
